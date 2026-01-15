@@ -10,7 +10,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 
 # =========================
-# HARD SETTINGS (simple app)
+# HARD SETTINGS
 # =========================
 BRAND_OPTIONS = {
     "Jared": "jared",
@@ -42,55 +42,57 @@ def inject_css():
     st.markdown(
         """
         <style>
-          .block-container { padding-top: 2rem; padding-bottom: 2rem; max-width: 1100px; }
-          h1, h2, h3 { letter-spacing: -0.02em; }
-          .subtle { color: rgba(255,255,255,0.75); font-size: 0.95rem; margin-top: -10px; }
+          .block-container {
+            padding-top: 1.2rem;
+            padding-bottom: 1.2rem;
+            max-width: 980px;
+          }
+
+          /* Reduce vertical whitespace between components */
+          div[data-testid="stVerticalBlock"] { gap: 0.6rem; }
+
+          h1 { letter-spacing: -0.02em; margin-bottom: 0.15rem; }
+          .subtitle { color: rgba(255,255,255,0.72); font-size: 0.95rem; margin-top: 0; }
+
           .card {
             background: rgba(255,255,255,0.06);
             border: 1px solid rgba(255,255,255,0.10);
-            border-radius: 16px;
-            padding: 16px 18px;
-            margin-bottom: 14px;
+            border-radius: 14px;
+            padding: 12px 14px;
+            margin: 0.35rem 0;
           }
+
           .muted { color: rgba(255,255,255,0.70); font-size: 0.92rem; }
-          .pill {
-            display: inline-block;
-            padding: 6px 10px;
-            border-radius: 999px;
-            font-size: 0.85rem;
-            border: 1px solid rgba(255,255,255,0.12);
-            background: rgba(255,255,255,0.04);
-            margin-right: 8px;
-          }
+
           .successbox {
             background: rgba(0, 255, 140, 0.10);
             border: 1px solid rgba(0, 255, 140, 0.25);
-            border-radius: 14px;
-            padding: 12px 14px;
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin-top: 0.35rem;
           }
+
           .warningbox {
             background: rgba(255, 200, 0, 0.10);
             border: 1px solid rgba(255, 200, 0, 0.25);
-            border-radius: 14px;
-            padding: 12px 14px;
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin-top: 0.35rem;
           }
+
           .footer {
-            margin-top: 18px;
+            margin-top: 12px;
             color: rgba(255,255,255,0.55);
             font-size: 0.85rem;
             text-align: center;
           }
+
+          /* Make uploader look tighter */
           div[data-testid="stFileUploader"] section {
             border: 1px dashed rgba(255,255,255,0.25);
-            border-radius: 14px;
-            padding: 6px 6px 10px 6px;
+            border-radius: 12px;
+            padding: 4px 6px 8px 6px;
             background: rgba(255,255,255,0.03);
-          }
-          .brandrow {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 8px;
           }
         </style>
         """,
@@ -99,7 +101,6 @@ def inject_css():
 
 
 def brand_icon(label):
-    # Emoji are simple but effective
     if label == "Jared":
         return "💎"
     if label == "Kay":
@@ -371,53 +372,32 @@ def build_template_bytes():
 # =========================
 # Streamlit App
 # =========================
-st.set_page_config(page_title="SKU PDF Builder", layout="centered")
+st.set_page_config(page_title="SKU Visual Analyzer", layout="centered")
 inject_css()
 
-st.markdown("<h1>SKU PDF Builder</h1>", unsafe_allow_html=True)
-st.markdown('<div class="subtle">Upload an XLSX and generate a clickable PDF grid of product images.</div>', unsafe_allow_html=True)
+st.markdown("<h1>SKU Visual Analyzer</h1>", unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Upload an XLSX to generate a clickable PDF grid of product images.</div>', unsafe_allow_html=True)
 
-st.markdown('<div class="card">', unsafe_allow_html=True)
-st.markdown(
-    """
-<div class="muted">
-<b>Required columns</b>: SKU, Revenue<br/>
-<b>Optional columns</b>: Units, AUR
-</div>
-""",
-    unsafe_allow_html=True,
-)
-template_bytes = build_template_bytes()
-st.download_button(
-    label="Download XLSX template",
-    data=template_bytes,
-    file_name="SKU_Template.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-)
-st.markdown("</div>", unsafe_allow_html=True)
+with st.container():
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="muted"><b>Required:</b> SKU, Revenue &nbsp;&nbsp; <b>Optional:</b> Units, AUR</div>', unsafe_allow_html=True)
+    st.download_button(
+        label="Download XLSX template",
+        data=build_template_bytes(),
+        file_name="SKU_Template.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# Brand selection "card"
-st.markdown('<div class="card">', unsafe_allow_html=True)
-brand_labels = list(BRAND_OPTIONS.keys())
-brand_label = st.selectbox("Brand", brand_labels, index=0, format_func=lambda x: f"{brand_icon(x)}  {x}")
+brand_label = st.selectbox(
+    "Brand",
+    list(BRAND_OPTIONS.keys()),
+    index=0,
+    format_func=lambda x: f"{brand_icon(x)}  {x}",
+)
 brand_domain = BRAND_OPTIONS[brand_label]
 
-st.markdown(
-    f"""
-<div class="brandrow">
-  <span class="pill">Images: www.{brand_domain}.com ... _0_800.jpg</span>
-  <span class="pill">Click opens: www.{brand_domain}.com/p/V-{"{SKU}"}</span>
-  <span class="pill">Grid: {GRID_ROWS} x {GRID_COLS}</span>
-</div>
-""",
-    unsafe_allow_html=True,
-)
-st.markdown("</div>", unsafe_allow_html=True)
-
-# Upload "card"
-st.markdown('<div class="card">', unsafe_allow_html=True)
 uploaded_file = st.file_uploader("Upload XLSX", type=["xlsx"])
-st.markdown("</div>", unsafe_allow_html=True)
 
 if uploaded_file is not None:
     try:
@@ -428,12 +408,9 @@ if uploaded_file is not None:
         total_pages = (len(items_all) + per_page - 1) // per_page
 
         st.markdown(
-            f'<div class="successbox"><b>Loaded:</b> {len(items_all)} unique SKUs after dedupe. '
-            f"<b>Pages:</b> {total_pages} ({per_page} tiles per page)</div>",
+            f'<div class="successbox"><b>Loaded:</b> {len(items_all)} unique SKUs &nbsp;&nbsp; <b>Pages:</b> {total_pages}</div>',
             unsafe_allow_html=True,
         )
-
-        st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
 
         if st.button("Generate PDF", type="primary"):
             progress = st.progress(0)
@@ -458,12 +435,9 @@ if uploaded_file is not None:
             status.markdown("**Building PDF...**")
             pdf_buffer = build_clickable_pdf(pages_tiles)
 
-            file_name = f"SKU_Clickable_Grid_{brand_domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            file_name = f"SKU_Visual_Analyzer_{brand_domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
 
-            st.markdown(
-                '<div class="successbox"><b>Done.</b> Your PDF is ready for download.</div>',
-                unsafe_allow_html=True,
-            )
+            st.markdown('<div class="successbox"><b>Done.</b> Your PDF is ready.</div>', unsafe_allow_html=True)
 
             st.download_button(
                 label="Download PDF",
@@ -473,9 +447,7 @@ if uploaded_file is not None:
             )
 
     except Exception as e:
-        st.markdown(
-            f'<div class="warningbox"><b>Error:</b> {str(e)}</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown(f'<div class="warningbox"><b>Error:</b> {str(e)}</div>', unsafe_allow_html=True)
 
-st.markdown('<div class="footer">Built for quick SKU image grids. Click any tile in the PDF to open the product page.</div>', unsafe_allow_html=True)
+st.markdown('<div class="footer">Each PDF tile is clickable and opens the SKU product page.</div>', unsafe_allow_html=True)
+
