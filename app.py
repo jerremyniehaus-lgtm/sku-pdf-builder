@@ -1,7 +1,5 @@
 import io
-import os
 import time
-import base64
 import requests
 import pandas as pd
 import streamlit as st
@@ -14,7 +12,11 @@ from reportlab.lib.utils import ImageReader
 # =========================
 # HARD SETTINGS (simple app)
 # =========================
-SUPPORTED_BRANDS = ["jared", "kay", "zales"]
+BRAND_OPTIONS = {
+    "Jared": "jared",
+    "Kay": "kay",
+    "Zales": "zales",
+}
 
 GRID_ROWS = 6
 GRID_COLS = 4
@@ -34,106 +36,18 @@ FONT_PLACEHOLDER = 34
 
 
 # =========================
-# Email helper (SendGrid)
-# =========================
-def get_sendgrid_settings():
-    """
-    Reads SendGrid credentials from either Streamlit secrets or environment variables.
-    """
-    api_key = None
-    from_email = None
-    from_name = None
-
-    try:
-        if "SENDGRID_API_KEY" in st.secrets:
-            api_key = st.secrets["SENDGRID_API_KEY"]
-    except Exception:
-        pass
-
-    try:
-        if "SENDGRID_FROM_EMAIL" in st.secrets:
-            from_email = st.secrets["SENDGRID_FROM_EMAIL"]
-    except Exception:
-        pass
-
-    try:
-        if "SENDGRID_FROM_NAME" in st.secrets:
-            from_name = st.secrets["SENDGRID_FROM_NAME"]
-    except Exception:
-        pass
-
-    if not api_key:
-        api_key = os.getenv("SENDGRID_API_KEY", "")
-    if not from_email:
-        from_email = os.getenv("SENDGRID_FROM_EMAIL", "")
-    if not from_name:
-        from_name = os.getenv("SENDGRID_FROM_NAME", "")
-
-    return api_key.strip(), from_email.strip(), from_name.strip()
-
-
-def send_pdf_email_sendgrid(to_email, pdf_bytes, filename, brand, sku_count):
-    """
-    Sends the PDF as an attachment via SendGrid API.
-    Requires env vars:
-      SENDGRID_API_KEY
-      SENDGRID_FROM_EMAIL
-    Optional:
-      SENDGRID_FROM_NAME
-    """
-    api_key, from_email, from_name = get_sendgrid_settings()
-
-    if not api_key or not from_email:
-        return False, "Email is not configured. Missing SENDGRID_API_KEY or SENDGRID_FROM_EMAIL."
-
-    pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
-
-    subject = f"SKU PDF Grid ({brand.upper()})"
-    body_text = f"Attached is your generated SKU PDF grid for {brand.upper()} ({sku_count} SKUs)."
-
-    payload = {
-        "personalizations": [{"to": [{"email": to_email}]}],
-        "from": {"email": from_email},
-        "subject": subject,
-        "content": [{"type": "text/plain", "value": body_text}],
-        "attachments": [
-            {
-                "content": pdf_b64,
-                "type": "application/pdf",
-                "filename": filename,
-                "disposition": "attachment",
-            }
-        ],
-    }
-
-    if from_name:
-        payload["from"]["name"] = from_name
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-
-    r = requests.post("https://api.sendgrid.com/v3/mail/send", headers=headers, json=payload, timeout=30)
-
-    if r.status_code in [200, 202]:
-        return True, "Email sent!"
-    return False, f"SendGrid error {r.status_code}: {r.text}"
-
-
-# =========================
 # URL builders
 # =========================
-def build_image_url(brand, sku_numeric):
-    return f"https://www.{brand}.com/productimages/processed/V-{sku_numeric}_0_800.jpg?pristine=true"
+def build_image_url(brand_domain, sku_numeric):
+    return f"https://www.{brand_domain}.com/productimages/processed/V-{sku_numeric}_0_800.jpg?pristine=true"
 
 
-def build_product_url(brand, sku_numeric):
-    return f"https://www.{brand}.com/p/V-{sku_numeric}"
+def build_product_url(brand_domain, sku_numeric):
+    return f"https://www.{brand_domain}.com/p/V-{sku_numeric}"
 
 
 # =========================
-# Data + formatting helpers
+# Helpers
 # =========================
 def normalize_sku(value):
     s = str(value).strip()
@@ -203,7 +117,7 @@ def make_missing_image_block(message, size_px, placeholder_font_size):
     return img
 
 
-def build_items_from_df(df, brand):
+def build_items_from_df(df, brand_domain):
     if "SKU" not in df.columns:
         raise ValueError('Missing required column: "SKU"')
     if "Revenue" not in df.columns:
@@ -247,8 +161,8 @@ def build_items_from_df(df, brand):
         items_all.append(
             {
                 "sku_label": sku_label,
-                "img_url": build_image_url(brand, sku_num),
-                "product_url": build_product_url(brand, sku_num),
+                "img_url": build_image_url(brand_domain, sku_num),
+                "product_url": build_product_url(brand_domain, sku_num),
                 "revenue_str": revenue_str,
                 "units_str": units_str,
                 "aur_str": aur_str,
@@ -366,31 +280,25 @@ def build_clickable_pdf(pages_items):
 
 
 # =========================
-# Streamlit UI
+# Streamlit UI (simple)
 # =========================
 st.set_page_config(page_title="SKU PDF Builder", layout="centered")
 
 st.title("SKU PDF Builder")
 st.write('Upload an XLSX with: "SKU", "Revenue", optional "Units", optional "AUR".')
 
-brand = st.selectbox("Brand", SUPPORTED_BRANDS, index=0)
+brand_label = st.selectbox("Brand", list(BRAND_OPTIONS.keys()), index=0)
+brand_domain = BRAND_OPTIONS[brand_label]
+
+st.caption(f"Image Source: https://www.{brand_domain}.com/productimages/processed/V-{{SKU}}_0_800.jpg")
+st.caption(f"Click Target: https://www.{brand_domain}.com/p/V-{{SKU}}")
+
 uploaded_file = st.file_uploader("Upload XLSX", type=["xlsx"])
-
-api_key, from_email, from_name = get_sendgrid_settings()
-email_enabled = bool(api_key and from_email)
-
-st.caption(f"Image Source: https://www.{brand}.com/productimages/processed/V-{{SKU}}_0_800.jpg")
-st.caption(f"Click Target: https://www.{brand}.com/p/V-{{SKU}}")
-
-if not email_enabled:
-    st.info('Email is currently disabled. To enable it, set "SENDGRID_API_KEY" and "SENDGRID_FROM_EMAIL" on Render.')
-
-email_to = st.text_input("Optional: Email PDF to (example@domain.com)", value="").strip()
 
 if uploaded_file is not None:
     try:
         df = pd.read_excel(uploaded_file)
-        items_all = build_items_from_df(df, brand)
+        items_all = build_items_from_df(df, brand_domain)
 
         per_page = GRID_ROWS * GRID_COLS
         total_pages = (len(items_all) + per_page - 1) // per_page
@@ -421,33 +329,17 @@ if uploaded_file is not None:
             status.write("Building PDF...")
             pdf_buffer = build_clickable_pdf(pages_tiles)
 
-            pdf_bytes = pdf_buffer.getvalue()
-            file_name = f"SKU_Clickable_Grid_{brand}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-
+            file_name = f"SKU_Clickable_Grid_{brand_domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
             st.success("Done!")
 
             st.download_button(
                 label="Download PDF",
-                data=pdf_bytes,
+                data=pdf_buffer,
                 file_name=file_name,
                 mime="application/pdf",
             )
 
-            # Optional Email send
-            if email_to and email_enabled:
-                with st.spinner("Emailing PDF..."):
-                    ok, msg = send_pdf_email_sendgrid(
-                        to_email=email_to,
-                        pdf_bytes=pdf_bytes,
-                        filename=file_name,
-                        brand=brand,
-                        sku_count=len(items_all),
-                    )
-                if ok:
-                    st.success(msg)
-                else:
-                    st.error(msg)
-
     except Exception as e:
         st.error(f"Error: {str(e)}")
+
 
