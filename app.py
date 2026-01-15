@@ -36,6 +36,80 @@ FONT_PLACEHOLDER = 34
 
 
 # =========================
+# UI Styling
+# =========================
+def inject_css():
+    st.markdown(
+        """
+        <style>
+          .block-container { padding-top: 2rem; padding-bottom: 2rem; max-width: 1100px; }
+          h1, h2, h3 { letter-spacing: -0.02em; }
+          .subtle { color: rgba(255,255,255,0.75); font-size: 0.95rem; margin-top: -10px; }
+          .card {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.10);
+            border-radius: 16px;
+            padding: 16px 18px;
+            margin-bottom: 14px;
+          }
+          .muted { color: rgba(255,255,255,0.70); font-size: 0.92rem; }
+          .pill {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.04);
+            margin-right: 8px;
+          }
+          .successbox {
+            background: rgba(0, 255, 140, 0.10);
+            border: 1px solid rgba(0, 255, 140, 0.25);
+            border-radius: 14px;
+            padding: 12px 14px;
+          }
+          .warningbox {
+            background: rgba(255, 200, 0, 0.10);
+            border: 1px solid rgba(255, 200, 0, 0.25);
+            border-radius: 14px;
+            padding: 12px 14px;
+          }
+          .footer {
+            margin-top: 18px;
+            color: rgba(255,255,255,0.55);
+            font-size: 0.85rem;
+            text-align: center;
+          }
+          div[data-testid="stFileUploader"] section {
+            border: 1px dashed rgba(255,255,255,0.25);
+            border-radius: 14px;
+            padding: 6px 6px 10px 6px;
+            background: rgba(255,255,255,0.03);
+          }
+          .brandrow {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+          }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def brand_icon(label):
+    # Emoji are simple but effective
+    if label == "Jared":
+        return "💎"
+    if label == "Kay":
+        return "✨"
+    if label == "Zales":
+        return "💍"
+    return "🛍️"
+
+
+# =========================
 # URL builders
 # =========================
 def build_image_url(brand_domain, sku_numeric):
@@ -218,7 +292,6 @@ def make_tile_image(item):
     draw.text((10, y + 112), line4, fill="black", font=f_rank)
 
     time.sleep(SLEEP_SECONDS)
-
     return tile, product_url
 
 
@@ -279,21 +352,72 @@ def build_clickable_pdf(pages_items):
     return pdf_buffer
 
 
+def build_template_bytes():
+    df = pd.DataFrame(
+        {
+            "SKU": ["564104305", "253329407"],
+            "Revenue": [123456, 98765],
+            "Units": [120, 88],
+            "AUR": [1029, 1122],
+        }
+    )
+    out = io.BytesIO()
+    with pd.ExcelWriter(out, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="SKU_List")
+    out.seek(0)
+    return out.getvalue()
+
+
 # =========================
-# Streamlit UI (simple)
+# Streamlit App
 # =========================
 st.set_page_config(page_title="SKU PDF Builder", layout="centered")
+inject_css()
 
-st.title("SKU PDF Builder")
-st.write('Upload an XLSX with: "SKU", "Revenue", optional "Units", optional "AUR".')
+st.markdown("<h1>SKU PDF Builder</h1>", unsafe_allow_html=True)
+st.markdown('<div class="subtle">Upload an XLSX and generate a clickable PDF grid of product images.</div>', unsafe_allow_html=True)
 
-brand_label = st.selectbox("Brand", list(BRAND_OPTIONS.keys()), index=0)
+st.markdown('<div class="card">', unsafe_allow_html=True)
+st.markdown(
+    """
+<div class="muted">
+<b>Required columns</b>: SKU, Revenue<br/>
+<b>Optional columns</b>: Units, AUR
+</div>
+""",
+    unsafe_allow_html=True,
+)
+template_bytes = build_template_bytes()
+st.download_button(
+    label="Download XLSX template",
+    data=template_bytes,
+    file_name="SKU_Template.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+)
+st.markdown("</div>", unsafe_allow_html=True)
+
+# Brand selection "card"
+st.markdown('<div class="card">', unsafe_allow_html=True)
+brand_labels = list(BRAND_OPTIONS.keys())
+brand_label = st.selectbox("Brand", brand_labels, index=0, format_func=lambda x: f"{brand_icon(x)}  {x}")
 brand_domain = BRAND_OPTIONS[brand_label]
 
-st.caption(f"Image Source: https://www.{brand_domain}.com/productimages/processed/V-{{SKU}}_0_800.jpg")
-st.caption(f"Click Target: https://www.{brand_domain}.com/p/V-{{SKU}}")
+st.markdown(
+    f"""
+<div class="brandrow">
+  <span class="pill">Images: www.{brand_domain}.com ... _0_800.jpg</span>
+  <span class="pill">Click opens: www.{brand_domain}.com/p/V-{"{SKU}"}</span>
+  <span class="pill">Grid: {GRID_ROWS} x {GRID_COLS}</span>
+</div>
+""",
+    unsafe_allow_html=True,
+)
+st.markdown("</div>", unsafe_allow_html=True)
 
+# Upload "card"
+st.markdown('<div class="card">', unsafe_allow_html=True)
 uploaded_file = st.file_uploader("Upload XLSX", type=["xlsx"])
+st.markdown("</div>", unsafe_allow_html=True)
 
 if uploaded_file is not None:
     try:
@@ -303,10 +427,15 @@ if uploaded_file is not None:
         per_page = GRID_ROWS * GRID_COLS
         total_pages = (len(items_all) + per_page - 1) // per_page
 
-        st.success(f"Loaded {len(items_all)} unique SKUs after dedupe.")
-        st.info(f"Output: {total_pages} page(s), {per_page} tiles per page.")
+        st.markdown(
+            f'<div class="successbox"><b>Loaded:</b> {len(items_all)} unique SKUs after dedupe. '
+            f"<b>Pages:</b> {total_pages} ({per_page} tiles per page)</div>",
+            unsafe_allow_html=True,
+        )
 
-        if st.button("Generate PDF"):
+        st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
+
+        if st.button("Generate PDF", type="primary"):
             progress = st.progress(0)
             status = st.empty()
 
@@ -314,7 +443,7 @@ if uploaded_file is not None:
             processed = 0
 
             for page_num, chunk in enumerate(chunk_list(items_all, per_page), start=1):
-                status.write(f"Building page {page_num} of {total_pages}...")
+                status.markdown(f"**Building page {page_num} of {total_pages}...**")
                 page_tiles = []
 
                 for item in chunk:
@@ -326,11 +455,15 @@ if uploaded_file is not None:
 
                 pages_tiles.append(page_tiles)
 
-            status.write("Building PDF...")
+            status.markdown("**Building PDF...**")
             pdf_buffer = build_clickable_pdf(pages_tiles)
 
             file_name = f"SKU_Clickable_Grid_{brand_domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-            st.success("Done!")
+
+            st.markdown(
+                '<div class="successbox"><b>Done.</b> Your PDF is ready for download.</div>',
+                unsafe_allow_html=True,
+            )
 
             st.download_button(
                 label="Download PDF",
@@ -340,6 +473,9 @@ if uploaded_file is not None:
             )
 
     except Exception as e:
-        st.error(f"Error: {str(e)}")
+        st.markdown(
+            f'<div class="warningbox"><b>Error:</b> {str(e)}</div>',
+            unsafe_allow_html=True,
+        )
 
-
+st.markdown('<div class="footer">Built for quick SKU image grids. Click any tile in the PDF to open the product page.</div>', unsafe_allow_html=True)
