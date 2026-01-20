@@ -42,43 +42,136 @@ def inject_css():
     st.markdown(
         """
         <style>
+          /* ===== Page sizing + fix clipped header ===== */
           .block-container {
-            padding-top: 1.1rem;
-            padding-bottom: 1.2rem;
             max-width: 1040px;
+            padding-top: 2.2rem !important;
+            padding-bottom: 1.6rem !important;
           }
 
-          div[data-testid="stVerticalBlock"] { gap: 0.55rem; }
+          /* Reduce random Streamlit whitespace */
+          section.main > div { padding-top: 0rem !important; }
 
-          h1 { letter-spacing: -0.02em; margin-bottom: 0.12rem; }
-          .subtitle { color: rgba(255,255,255,0.72); font-size: 0.95rem; margin-top: 0; }
+          /* Tighten vertical gaps in general */
+          div[data-testid="stVerticalBlock"] { gap: 0.75rem; }
 
+          /* ===== Title area ===== */
+          .app-header {
+            background: linear-gradient(135deg, rgba(59,130,246,0.22), rgba(16,185,129,0.12));
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 18px;
+            padding: 16px 18px 14px 18px;
+            margin-bottom: 0.9rem;
+          }
+
+          .app-title {
+            font-size: 2.05rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1.15;
+            margin: 0;
+            padding: 0;
+          }
+
+          .app-subtitle {
+            margin-top: 6px;
+            color: rgba(255,255,255,0.72);
+            font-size: 0.98rem;
+          }
+
+          /* ===== Cards ===== */
           .card {
-            background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(255,255,255,0.055);
+            border: 1px solid rgba(255,255,255,0.11);
+            border-radius: 16px;
+            padding: 14px 14px;
+            margin: 0;
+          }
+
+          .card-title {
+            font-weight: 700;
+            font-size: 0.95rem;
+            margin-bottom: 10px;
+            color: rgba(255,255,255,0.88);
+          }
+
+          .muted {
+            color: rgba(255,255,255,0.68);
+            font-size: 0.92rem;
+          }
+
+          .divider {
+            height: 1px;
+            background: rgba(255,255,255,0.10);
+            margin: 12px 0;
+          }
+
+          /* ===== Status banners (no overlap, guaranteed spacing) ===== */
+          .status-ok {
+            display: block;
+            background: rgba(16,185,129,0.12);
+            border: 1px solid rgba(16,185,129,0.28);
             border-radius: 14px;
-            padding: 12px 14px;
-            margin: 0.30rem 0;
-          }
-
-          .muted { color: rgba(255,255,255,0.70); font-size: 0.92rem; }
-
-          .successbox {
-            background: rgba(0, 255, 140, 0.10);
-            border: 1px solid rgba(0, 255, 140, 0.25);
-            border-radius: 12px;
             padding: 10px 12px;
-            margin-top: 0.35rem;
+            margin-top: 10px;
+            margin-bottom: 10px;
           }
 
-          .warningbox {
-            background: rgba(255, 200, 0, 0.10);
-            border: 1px solid rgba(255, 200, 0, 0.25);
-            border-radius: 12px;
+          .status-warn {
+            display: block;
+            background: rgba(245,158,11,0.12);
+            border: 1px solid rgba(245,158,11,0.28);
+            border-radius: 14px;
             padding: 10px 12px;
-            margin-top: 0.35rem;
+            margin-top: 10px;
+            margin-bottom: 10px;
           }
 
+          /* ===== Upload box polish ===== */
+          div[data-testid="stFileUploader"] section {
+            border: 1px dashed rgba(255,255,255,0.28);
+            border-radius: 14px;
+            padding: 8px 10px 10px 10px;
+            background: rgba(255,255,255,0.03);
+          }
+
+          /* ===== Buttons polish ===== */
+          div.stButton > button {
+            width: 100%;
+            border-radius: 14px;
+            padding: 0.78rem 1rem;
+            font-weight: 750;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(59,130,246,0.90);
+          }
+          div.stButton > button:hover {
+            filter: brightness(1.05);
+            border: 1px solid rgba(255,255,255,0.20);
+          }
+
+          /* Download button */
+          div[data-testid="stDownloadButton"] > button {
+            width: 100%;
+            border-radius: 14px;
+            padding: 0.72rem 1rem;
+            font-weight: 750;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(16,185,129,0.88);
+          }
+          div[data-testid="stDownloadButton"] > button:hover {
+            filter: brightness(1.05);
+            border: 1px solid rgba(255,255,255,0.20);
+          }
+
+          /* Make selectbox + toggle look cleaner */
+          div[data-testid="stSelectbox"] > div {
+            border-radius: 14px;
+          }
+          div[data-testid="stToggleSwitch"] {
+            padding-top: 0.4rem;
+          }
+
+          /* Footer */
           .footer {
             margin-top: 12px;
             color: rgba(255,255,255,0.55);
@@ -86,12 +179,8 @@ def inject_css():
             text-align: center;
           }
 
-          div[data-testid="stFileUploader"] section {
-            border: 1px dashed rgba(255,255,255,0.25);
-            border-radius: 12px;
-            padding: 4px 6px 8px 6px;
-            background: rgba(255,255,255,0.03);
-          }
+          /* Prevent accidental margin collapse between markdown blocks */
+          .no-collapse { display: block; height: 0.01px; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -219,6 +308,7 @@ def build_items_from_df(df, brand_domain):
         sku_label = f"V-{sku_num}"
 
         revenue_str = format_money(row["Revenue_num"], decimals=0) if pd.notna(row["Revenue_num"]) else ""
+
         units_str = ""
         if "Units" in df.columns and pd.notna(row.get("Units")):
             units_str = format_int(row.get("Units"))
@@ -352,10 +442,6 @@ def build_clickable_pdf(pages_items):
 
 
 def build_preview_page_image(tile_images):
-    """
-    tile_images: list[PIL.Image] where each image is one tile (image + text block)
-    Returns a single PIL.Image showing the full grid page.
-    """
     tile_w = IMG_SIZE_PX
     tile_h = IMG_SIZE_PX + TEXT_BLOCK_HEIGHT
 
@@ -379,7 +465,6 @@ def build_preview_page_image(tile_images):
 
         paste_x = x0 + BORDER_PX + CELL_PAD
         paste_y = y0 + BORDER_PX + CELL_PAD
-
         page.paste(tile, (paste_x, paste_y))
 
     return page
@@ -407,34 +492,61 @@ def build_template_bytes():
 st.set_page_config(page_title="SKU Visual Analyzer", layout="centered")
 inject_css()
 
-st.markdown("<h1>SKU Visual Analyzer</h1>", unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Upload an XLSX to generate a clickable PDF grid of product images.</div>', unsafe_allow_html=True)
-
-st.markdown('<div class="card">', unsafe_allow_html=True)
-st.markdown('<div class="muted"><b>Required:</b> SKU, Revenue &nbsp;&nbsp; <b>Optional:</b> Units, AUR</div>', unsafe_allow_html=True)
-st.download_button(
-    label="Download XLSX template",
-    data=build_template_bytes(),
-    file_name="SKU_Template.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+st.markdown(
+    """
+    <div class="app-header">
+      <div class="app-title">SKU Visual Analyzer</div>
+      <div class="app-subtitle">Upload an XLSX to generate a clickable PDF grid of product images.</div>
+    </div>
+    <span class="no-collapse"></span>
+    """,
+    unsafe_allow_html=True,
 )
-st.markdown("</div>", unsafe_allow_html=True)
 
-col1, col2 = st.columns([1, 1])
-with col1:
+# Top controls in a clean 2-column layout
+top_left, top_right = st.columns([1.25, 1.0], gap="large")
+
+with top_left:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title">Input file</div>', unsafe_allow_html=True)
+    st.markdown('<div class="muted"><b>Required:</b> SKU, Revenue<br/><b>Optional:</b> Units, AUR</div>', unsafe_allow_html=True)
+
+    st.download_button(
+        label="Download XLSX template",
+        data=build_template_bytes(),
+        file_name="SKU_Template.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+
+    uploaded_file = st.file_uploader("Upload XLSX", type=["xlsx"])
+    st.markdown("</div>", unsafe_allow_html=True)
+
+with top_right:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="card-title">Settings</div>', unsafe_allow_html=True)
+
     brand_label = st.selectbox(
         "Brand",
         list(BRAND_OPTIONS.keys()),
         index=0,
         format_func=lambda x: f"{brand_icon(x)}  {x}",
     )
-with col2:
-    show_all_pages = st.toggle("Show all preview pages", value=False)
+
+    show_all_pages = st.toggle("Preview all pages", value=False)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 brand_domain = BRAND_OPTIONS[brand_label]
-uploaded_file = st.file_uploader("Upload XLSX", type=["xlsx"])
 
-if uploaded_file is not None:
+# Main action area
+st.markdown('<div class="card">', unsafe_allow_html=True)
+st.markdown('<div class="card-title">Generate</div>', unsafe_allow_html=True)
+
+if uploaded_file is None:
+    st.markdown('<div class="muted">Upload an XLSX to begin.</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+else:
     try:
         df = pd.read_excel(uploaded_file)
         items_all = build_items_from_df(df, brand_domain)
@@ -443,11 +555,15 @@ if uploaded_file is not None:
         total_pages = (len(items_all) + per_page - 1) // per_page
 
         st.markdown(
-            f'<div class="successbox"><b>Loaded:</b> {len(items_all)} unique SKUs &nbsp;&nbsp; <b>Pages:</b> {total_pages}</div>',
+            f'<div class="status-ok"><b>Loaded:</b> {len(items_all)} unique SKUs &nbsp;&nbsp; <b>Pages:</b> {total_pages}</div>',
             unsafe_allow_html=True,
         )
 
-        if st.button("Generate PDF + Preview", type="primary"):
+        generate_clicked = st.button("Generate PDF + Preview", type="primary")
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        if generate_clicked:
             progress = st.progress(0)
             status = st.empty()
 
@@ -472,7 +588,6 @@ if uploaded_file is not None:
 
                 pages_tiles.append(page_tiles)
 
-                # Build preview page image (always build page 1 preview, optionally all pages)
                 if page_num == 1 or show_all_pages:
                     preview_img = build_preview_page_image(page_tile_images_for_preview)
                     pages_preview_images.append((page_num, preview_img))
@@ -482,7 +597,7 @@ if uploaded_file is not None:
 
             file_name = f"SKU_Visual_Analyzer_{brand_domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
 
-            st.markdown('<div class="successbox"><b>Done.</b> Preview below, then download your PDF.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="status-ok"><b>Done.</b> Preview below, then download your PDF.</div>', unsafe_allow_html=True)
 
             st.download_button(
                 label="Download PDF",
@@ -491,17 +606,23 @@ if uploaded_file is not None:
                 mime="application/pdf",
             )
 
-            st.markdown("### Preview")
-            if not pages_preview_images:
-                st.info("No preview images generated.")
-            else:
-                for page_num, preview_img in pages_preview_images:
-                    st.markdown(f"**Page {page_num}**")
-                    st.image(preview_img, use_container_width=True)
+            st.markdown('<div class="card" style="margin-top: 0.85rem;">', unsafe_allow_html=True)
+            st.markdown('<div class="card-title">Preview</div>', unsafe_allow_html=True)
+
+            for page_num, preview_img in pages_preview_images:
+                st.markdown(f"**Page {page_num}**")
+                st.image(preview_img, use_container_width=True)
+
+            st.markdown("</div>", unsafe_allow_html=True)
 
     except Exception as e:
-        st.markdown(f'<div class="warningbox"><b>Error:</b> {str(e)}</div>', unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="status-warn"><b>Error:</b> {str(e)}</div>',
+            unsafe_allow_html=True,
+        )
 
 st.markdown('<div class="footer">Each PDF tile is clickable and opens the SKU product page.</div>', unsafe_allow_html=True)
+
 
 
