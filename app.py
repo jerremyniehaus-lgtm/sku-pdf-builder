@@ -27,7 +27,7 @@ TEXT_BLOCK_HEIGHT = 150
 BORDER_PX = 3
 CELL_PAD = 10
 
-SLEEP_SECONDS = 0.15
+SLEEP_SECONDS = 0.12
 
 FONT_SKU = 30
 FONT_LINE = 24
@@ -43,15 +43,14 @@ def inject_css():
         """
         <style>
           .block-container {
-            padding-top: 1.2rem;
+            padding-top: 1.1rem;
             padding-bottom: 1.2rem;
-            max-width: 980px;
+            max-width: 1040px;
           }
 
-          /* Reduce vertical whitespace between components */
-          div[data-testid="stVerticalBlock"] { gap: 0.6rem; }
+          div[data-testid="stVerticalBlock"] { gap: 0.55rem; }
 
-          h1 { letter-spacing: -0.02em; margin-bottom: 0.15rem; }
+          h1 { letter-spacing: -0.02em; margin-bottom: 0.12rem; }
           .subtitle { color: rgba(255,255,255,0.72); font-size: 0.95rem; margin-top: 0; }
 
           .card {
@@ -59,7 +58,7 @@ def inject_css():
             border: 1px solid rgba(255,255,255,0.10);
             border-radius: 14px;
             padding: 12px 14px;
-            margin: 0.35rem 0;
+            margin: 0.30rem 0;
           }
 
           .muted { color: rgba(255,255,255,0.70); font-size: 0.92rem; }
@@ -87,7 +86,6 @@ def inject_css():
             text-align: center;
           }
 
-          /* Make uploader look tighter */
           div[data-testid="stFileUploader"] section {
             border: 1px dashed rgba(255,255,255,0.25);
             border-radius: 12px;
@@ -353,6 +351,40 @@ def build_clickable_pdf(pages_items):
     return pdf_buffer
 
 
+def build_preview_page_image(tile_images):
+    """
+    tile_images: list[PIL.Image] where each image is one tile (image + text block)
+    Returns a single PIL.Image showing the full grid page.
+    """
+    tile_w = IMG_SIZE_PX
+    tile_h = IMG_SIZE_PX + TEXT_BLOCK_HEIGHT
+
+    cell_w = tile_w + (BORDER_PX * 2) + (CELL_PAD * 2)
+    cell_h = tile_h + (BORDER_PX * 2) + (CELL_PAD * 2)
+
+    page_w = GRID_COLS * cell_w
+    page_h = GRID_ROWS * cell_h
+
+    page = Image.new("RGB", (page_w, page_h), "white")
+    draw = ImageDraw.Draw(page)
+
+    for idx, tile in enumerate(tile_images):
+        row = idx // GRID_COLS
+        col = idx % GRID_COLS
+
+        x0 = col * cell_w
+        y0 = row * cell_h
+
+        draw.rectangle([(x0, y0), (x0 + cell_w - 1, y0 + cell_h - 1)], outline="black", width=BORDER_PX)
+
+        paste_x = x0 + BORDER_PX + CELL_PAD
+        paste_y = y0 + BORDER_PX + CELL_PAD
+
+        page.paste(tile, (paste_x, paste_y))
+
+    return page
+
+
 def build_template_bytes():
     df = pd.DataFrame(
         {
@@ -378,25 +410,28 @@ inject_css()
 st.markdown("<h1>SKU Visual Analyzer</h1>", unsafe_allow_html=True)
 st.markdown('<div class="subtitle">Upload an XLSX to generate a clickable PDF grid of product images.</div>', unsafe_allow_html=True)
 
-with st.container():
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="muted"><b>Required:</b> SKU, Revenue &nbsp;&nbsp; <b>Optional:</b> Units, AUR</div>', unsafe_allow_html=True)
-    st.download_button(
-        label="Download XLSX template",
-        data=build_template_bytes(),
-        file_name="SKU_Template.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
-
-brand_label = st.selectbox(
-    "Brand",
-    list(BRAND_OPTIONS.keys()),
-    index=0,
-    format_func=lambda x: f"{brand_icon(x)}  {x}",
+st.markdown('<div class="card">', unsafe_allow_html=True)
+st.markdown('<div class="muted"><b>Required:</b> SKU, Revenue &nbsp;&nbsp; <b>Optional:</b> Units, AUR</div>', unsafe_allow_html=True)
+st.download_button(
+    label="Download XLSX template",
+    data=build_template_bytes(),
+    file_name="SKU_Template.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
-brand_domain = BRAND_OPTIONS[brand_label]
+st.markdown("</div>", unsafe_allow_html=True)
 
+col1, col2 = st.columns([1, 1])
+with col1:
+    brand_label = st.selectbox(
+        "Brand",
+        list(BRAND_OPTIONS.keys()),
+        index=0,
+        format_func=lambda x: f"{brand_icon(x)}  {x}",
+    )
+with col2:
+    show_all_pages = st.toggle("Show all preview pages", value=False)
+
+brand_domain = BRAND_OPTIONS[brand_label]
 uploaded_file = st.file_uploader("Upload XLSX", type=["xlsx"])
 
 if uploaded_file is not None:
@@ -412,32 +447,42 @@ if uploaded_file is not None:
             unsafe_allow_html=True,
         )
 
-        if st.button("Generate PDF", type="primary"):
+        if st.button("Generate PDF + Preview", type="primary"):
             progress = st.progress(0)
             status = st.empty()
 
             pages_tiles = []
+            pages_preview_images = []
+
             processed = 0
 
             for page_num, chunk in enumerate(chunk_list(items_all, per_page), start=1):
                 status.markdown(f"**Building page {page_num} of {total_pages}...**")
+
                 page_tiles = []
+                page_tile_images_for_preview = []
 
                 for item in chunk:
                     tile_img, link_url = make_tile_image(item)
                     page_tiles.append((tile_img, link_url))
+                    page_tile_images_for_preview.append(tile_img)
 
                     processed += 1
                     progress.progress(min(1.0, processed / len(items_all)))
 
                 pages_tiles.append(page_tiles)
 
+                # Build preview page image (always build page 1 preview, optionally all pages)
+                if page_num == 1 or show_all_pages:
+                    preview_img = build_preview_page_image(page_tile_images_for_preview)
+                    pages_preview_images.append((page_num, preview_img))
+
             status.markdown("**Building PDF...**")
             pdf_buffer = build_clickable_pdf(pages_tiles)
 
             file_name = f"SKU_Visual_Analyzer_{brand_domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
 
-            st.markdown('<div class="successbox"><b>Done.</b> Your PDF is ready.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="successbox"><b>Done.</b> Preview below, then download your PDF.</div>', unsafe_allow_html=True)
 
             st.download_button(
                 label="Download PDF",
@@ -446,8 +491,17 @@ if uploaded_file is not None:
                 mime="application/pdf",
             )
 
+            st.markdown("### Preview")
+            if not pages_preview_images:
+                st.info("No preview images generated.")
+            else:
+                for page_num, preview_img in pages_preview_images:
+                    st.markdown(f"**Page {page_num}**")
+                    st.image(preview_img, use_container_width=True)
+
     except Exception as e:
         st.markdown(f'<div class="warningbox"><b>Error:</b> {str(e)}</div>', unsafe_allow_html=True)
 
 st.markdown('<div class="footer">Each PDF tile is clickable and opens the SKU product page.</div>', unsafe_allow_html=True)
+
 
